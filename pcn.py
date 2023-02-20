@@ -1,0 +1,155 @@
+import torch
+
+
+class PCN(object):
+
+    def __init__(
+        self,
+        network,
+        dt=0.01,
+        device="cpu"
+    ):
+
+        self.network = network.to(device)
+        self.n_layers = len(self.network)
+        self.n_nodes = self.n_layers + 1
+        self.dt = dt
+        self.n_params = sum(
+            p.numel() for p in network.parameters() if p.requires_grad
+        )
+        self.device = device
+
+    def reset(self):
+        self.zero_grad()
+        self.preds = [None] * self.n_nodes
+        self.errs = [None] * self.n_nodes
+        self.xs = [None] * self.n_nodes
+
+    def reset_xs(self, prior, init_std):
+        self.set_prior(prior)
+        self.propagate_xs()
+        for l in range(self.n_layers):
+            self.xs[l] = torch.empty(self.xs[l].shape).normal_(
+                mean=0, std=init_std).to(self.device)
+
+    def set_obs(self, obs):
+        self.xs[-1] = obs.clone()
+
+    def set_prior(self, prior):
+        self.xs[0] = prior.clone()
+
+    def forward(self, x):
+        return self.network(x)
+
+    def propagate_xs(self):
+        for l in range(1, self.n_layers):
+            self.xs[l] = self.network[l - 1](self.xs[l - 1])
+
+    def infer_train(
+        self,
+        obs,
+        prior,
+        n_iters,
+        init_std=0.05
+    ):
+
+        self.reset()
+        self.set_prior(prior)
+        self.propagate_xs()
+        self.set_obs(obs)
+
+        for t in range(n_iters):
+            self.network.zero_grad()
+            self.preds[-1] = self.network[self.n_layers -
+                                          1](self.xs[self.n_layers - 1])
+            self.errs[-1] = self.xs[-1] - self.preds[-1]
+
+            for l in reversed(range(1, self.n_layers)):
+                self.preds[l] = self.network[l - 1](self.xs[l - 1])
+                self.errs[l] = self.xs[l] - self.preds[l]
+                _, epsdfdx = torch.autograd.functional.vjp(
+                    self.network[l], self.xs[l], self.errs[l + 1])
+                with torch.no_grad():
+                    dx = epsdfdx - self.errs[l]
+                    self.xs[l] = self.xs[l] + self.dt * dx
+
+            if (t+1) != n_iters:
+                self.clear_grads()
+
+        self.set_weight_grads()
+
+    def infer_test(
+        self,
+        obs,
+        prior,
+        n_iters,
+        init_std=0.05,
+    ):
+
+        self.reset()
+        self.reset_xs(prior, init_std)
+        self.set_obs(obs)
+
+        for t in range(n_iters):
+            self.network.zero_grad()
+            self.preds[-1] = self.network[self.n_layers -
+                                          1](self.xs[self.n_layers - 1])
+            self.errs[-1] = self.xs[-1] - self.preds[-1]
+
+            for l in reversed(range(1, self.n_layers)):
+                self.preds[l] = self.network[l - 1](self.xs[l - 1])
+                self.errs[l] = self.xs[l] - self.preds[l]
+                _, epsdfdx = torch.autograd.functional.vjp(
+                    self.network[l], self.xs[l], self.errs[l + 1])
+                with torch.no_grad():
+                    dx = epsdfdx - self.errs[l]
+                    self.xs[l] = self.xs[l] + self.dt * dx
+
+            _, epsdfdx = torch.autograd.functional.vjp(
+                self.network[0], self.xs[0], self.errs[1])
+            with torch.no_grad():
+                self.xs[0] = self.xs[0] + self.dt * epsdfdx
+
+            if (t+1) != n_iters:
+                self.clear_grads()
+
+        return self.xs[0]
+
+    def set_weight_grads(self):
+        for l in range(self.n_layers):
+            for w in self.network[l].parameters():
+                dw = torch.autograd.grad(
+                    self.preds[l + 1],
+                    w,
+                    - self.errs[l + 1],
+                    allow_unused=True,
+                    retain_graph=True
+                )[0]
+                w.grad = dw.clone()
+
+    def zero_grad(self):
+        self.network.zero_grad()
+
+    def save_weights(self, path):
+        torch.save(self.network.state_dict(), path)
+
+    def load_weights(self, path):
+        self.network.load_state_dict(torch.load(path))
+
+    def clear_grads(self):
+        with torch.no_grad():
+            for l in range(1, self.n_nodes):
+                self.preds[l] = self.preds[l].clone()
+                self.errs[l] = self.errs[l].clone()
+                self.xs[l] = self.xs[l].clone()
+
+    # @property
+    # def free_energy(self) -> float:
+    #     return (self.errs **2).mean().item()
+
+    @property
+    def loss(self) -> float:
+        return (self.errs[-1]**2).mean().item()
+
+    def __str__(self):
+        return f"PCN(\n{self.network}\n"
