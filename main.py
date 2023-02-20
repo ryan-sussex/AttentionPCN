@@ -1,6 +1,3 @@
-# @title Imports
-
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -13,7 +10,6 @@ import random
 from dataset import MNIST
 from utils import get_device, set_seed, save_run, accuracy
 from pcn import PCN
-# @title Archs
 
 LR = 1e-4
 BATCH_SIZE = 64
@@ -22,7 +18,7 @@ INFERENCE_ITERS_TEST = 200
 N_EPOCHS = 2
 
 
-network = nn.Sequential(
+NETWORK = nn.Sequential(
     nn.Sequential(
         nn.Linear(10, 250),
         nn.Tanh()
@@ -47,7 +43,7 @@ def train(seed):
         test_data, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
 
     model = PCN(
-        network=network,
+        network=NETWORK,
         device=device
     )
     optimizer = optim.Adam(model.network.parameters(), lr=LR)
@@ -73,7 +69,9 @@ def train(seed):
 
             if batch_id % log_every == 0:
                 print(
-                    f"Train loss: {model.loss:.5f} [{batch_id * len(img_batch)}/{len(train_loader.dataset)}]")
+                    f"Train loss: {model.loss:.5f}"
+                    f"[{batch_id * len(img_batch)}/{len(train_loader.dataset)}]"
+                )
 
         test_loss, test_acc = (0, 0)
         for batch_id, (img_batch, label_batch) in enumerate(test_loader):
