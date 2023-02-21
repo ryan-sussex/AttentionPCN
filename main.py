@@ -70,7 +70,8 @@ def train(seed):
             if batch_id % log_every == 0:
                 print(
                     f"Train loss: {model.loss:.5f}"
-                    f"[{batch_id * len(img_batch)}/{len(train_loader.dataset)}]"
+                    f"[{batch_id * len(img_batch)}/"
+                    f"{len(train_loader.dataset)}]"
                 )
 
         test_loss, test_acc = (0, 0)
