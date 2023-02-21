@@ -6,21 +6,24 @@ from dataset import MNIST
 from utils import get_device, set_seed, save_run, accuracy
 from pcn import PCN
 
+# Training Params
 LR = 1e-4
 BATCH_SIZE = 64
+N_EPOCHS = 2
+# Inference Params
+INFERENCE_LR = 0.01
 INFERENCE_ITERS_TRAIN = 10
 INFERENCE_ITERS_TEST = 200
-N_EPOCHS = 2
 
 
 NETWORK = nn.Sequential(
     nn.Sequential(
         nn.Linear(10, 250),
-        nn.Tanh()
+        # nn.Tanh()
     ),
     nn.Sequential(
         nn.Linear(250, 250),
-        nn.Tanh()
+        # nn.Tanh()
     ),
     nn.Linear(250, 28*28)
 )
@@ -39,7 +42,8 @@ def train(seed):
 
     model = PCN(
         network=NETWORK,
-        device=device
+        device=device,
+        dt=INFERENCE_LR
     )
     optimizer = optim.Adam(model.network.parameters(), lr=LR)
 

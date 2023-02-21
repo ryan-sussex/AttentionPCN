@@ -1,3 +1,4 @@
+from typing import Union
 import torch
 
 
@@ -6,8 +7,8 @@ class PCN(object):
     def __init__(
         self,
         network,
-        dt=0.01,
-        device="cpu"
+        dt: float = 0.01,
+        device: Union[str, int] ="cpu"
     ):
 
         self.network = network.to(device)
