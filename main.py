@@ -1,11 +1,6 @@
-import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from torchvision import datasets, transforms
-
-import numpy as np
-import random
 
 from dataset import MNIST
 from utils import get_device, set_seed, save_run, accuracy
@@ -59,13 +54,14 @@ def train(seed):
             img_batch = img_batch.to(device)
             label_batch = label_batch.to(device)
 
-            model.infer_train(
+            model.infer(
                 obs=img_batch,
                 prior=label_batch,
-                n_iters=INFERENCE_ITERS_TRAIN
+                n_iters=INFERENCE_ITERS_TRAIN,
+                test=False
             )
             optimizer.step()
-            train_loss += (model.errs[-1]**2).mean().item()
+            train_loss += model.loss
 
             if batch_id % log_every == 0:
                 print(
@@ -78,10 +74,11 @@ def train(seed):
             img_batch = img_batch.to(device)
             label_batch = label_batch.to(device)
 
-            label_preds = model.infer_test(
+            label_preds = model.infer(
                 obs=img_batch,
                 prior=label_batch,
-                n_iters=INFERENCE_ITERS_TEST
+                n_iters=INFERENCE_ITERS_TEST,
+                test=True
             )
             test_loss += model.loss
             test_acc += accuracy(label_preds, label_batch)
