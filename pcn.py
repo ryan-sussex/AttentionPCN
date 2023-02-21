@@ -46,17 +46,26 @@ class PCN(object):
         for l in range(1, self.n_layers):
             self.xs[l] = self.network[l - 1](self.xs[l - 1])
 
-    def infer_train(
+    def infer(
         self,
-        obs,
-        prior,
-        n_iters,
-        init_std=0.05
-    ):
+        obs: torch.Tensor,
+        prior: torch.Tensor,
+        n_iters: int,
+        init_std: float = 0.05,
+        test: bool =  False
+    ) -> torch.Tensor:
+        """
+        Runs n_iters of inference updates, calculating prediction errrors at
+        each layer and using these to update the activities.
 
+        After convergence (or early stopping) the weight gradients 
+        are calculated in order for the optimiser to perform gradient descent.
+        """
         self.reset()
         self.set_prior(prior)
         self.propagate_xs()
+        if test:
+            self.reset_xs(prior, init_std)
         self.set_obs(obs)
 
         for t in range(n_iters):
@@ -66,54 +75,28 @@ class PCN(object):
             self.errs[-1] = self.xs[-1] - self.preds[-1]
 
             for l in reversed(range(1, self.n_layers)):
+                # Create predictions (activities)
                 self.preds[l] = self.network[l - 1](self.xs[l - 1])
+                # Create errors
                 self.errs[l] = self.xs[l] - self.preds[l]
+                # Calculate gradient
                 _, epsdfdx = torch.autograd.functional.vjp(
                     self.network[l], self.xs[l], self.errs[l + 1])
                 with torch.no_grad():
+                    # Update x using gradient.
                     dx = epsdfdx - self.errs[l]
                     self.xs[l] = self.xs[l] + self.dt * dx
+            
+            if test: # In test mode we need to update the first layer
+                _, epsdfdx = torch.autograd.functional.vjp(
+                    self.network[0], self.xs[0], self.errs[1])
+                with torch.no_grad():
+                    self.xs[0] = self.xs[0] + self.dt * epsdfdx
 
             if (t+1) != n_iters:
                 self.clear_grads()
-
+            
         self.set_weight_grads()
-
-    def infer_test(
-        self,
-        obs,
-        prior,
-        n_iters,
-        init_std=0.05,
-    ):
-
-        self.reset()
-        self.reset_xs(prior, init_std)
-        self.set_obs(obs)
-
-        for t in range(n_iters):
-            self.network.zero_grad()
-            self.preds[-1] = self.network[self.n_layers -
-                                          1](self.xs[self.n_layers - 1])
-            self.errs[-1] = self.xs[-1] - self.preds[-1]
-
-            for l in reversed(range(1, self.n_layers)):
-                self.preds[l] = self.network[l - 1](self.xs[l - 1])
-                self.errs[l] = self.xs[l] - self.preds[l]
-                _, epsdfdx = torch.autograd.functional.vjp(
-                    self.network[l], self.xs[l], self.errs[l + 1])
-                with torch.no_grad():
-                    dx = epsdfdx - self.errs[l]
-                    self.xs[l] = self.xs[l] + self.dt * dx
-
-            _, epsdfdx = torch.autograd.functional.vjp(
-                self.network[0], self.xs[0], self.errs[1])
-            with torch.no_grad():
-                self.xs[0] = self.xs[0] + self.dt * epsdfdx
-
-            if (t+1) != n_iters:
-                self.clear_grads()
-
         return self.xs[0]
 
     def set_weight_grads(self):

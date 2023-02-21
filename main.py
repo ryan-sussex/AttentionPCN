@@ -54,10 +54,11 @@ def train(seed):
             img_batch = img_batch.to(device)
             label_batch = label_batch.to(device)
 
-            model.infer_train(
+            model.infer(
                 obs=img_batch,
                 prior=label_batch,
-                n_iters=INFERENCE_ITERS_TRAIN
+                n_iters=INFERENCE_ITERS_TRAIN,
+                test=False
             )
             optimizer.step()
             train_loss += model.loss
@@ -73,10 +74,11 @@ def train(seed):
             img_batch = img_batch.to(device)
             label_batch = label_batch.to(device)
 
-            label_preds = model.infer_test(
+            label_preds = model.infer(
                 obs=img_batch,
                 prior=label_batch,
-                n_iters=INFERENCE_ITERS_TEST
+                n_iters=INFERENCE_ITERS_TEST,
+                test=True
             )
             test_loss += model.loss
             test_acc += accuracy(label_preds, label_batch)
