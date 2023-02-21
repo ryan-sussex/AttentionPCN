@@ -29,6 +29,7 @@ class PCN(object):
         self.set_prior(prior)
         self.propagate_xs()
         for l in range(self.n_layers):
+            # Doesn't this just overwrite the first two lines?
             self.xs[l] = torch.empty(self.xs[l].shape).normal_(
                 mean=0, std=init_std).to(self.device)
 
