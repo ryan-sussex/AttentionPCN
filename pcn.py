@@ -8,7 +8,7 @@ class PCN(object):
         self,
         network,
         dt: float = 0.01,
-        device: Union[str, int] ="cpu"
+        device: Union[str, int] = "cpu"
     ):
 
         self.network = network.to(device)
@@ -53,13 +53,13 @@ class PCN(object):
         prior: torch.Tensor,
         n_iters: int,
         init_std: float = 0.05,
-        test: bool =  False
+        test: bool = False
     ) -> torch.Tensor:
         """
         Runs n_iters of inference updates, calculating prediction errrors at
         each layer and using these to update the activities.
 
-        After convergence (or early stopping) the weight gradients 
+        After convergence (or early stopping) the weight gradients
         are calculated in order for the optimiser to perform gradient descent.
         """
         self.reset()
@@ -87,8 +87,8 @@ class PCN(object):
                     # Update x using gradient.
                     dx = epsdfdx - self.errs[l]
                     self.xs[l] = self.xs[l] + self.dt * dx
-            
-            if test: # In test mode we need to update the first layer
+
+            if test:  # In test mode we need to update the first layer
                 _, epsdfdx = torch.autograd.functional.vjp(
                     self.network[0], self.xs[0], self.errs[1])
                 with torch.no_grad():
@@ -96,7 +96,7 @@ class PCN(object):
 
             if (t+1) != n_iters:
                 self.clear_grads()
-            
+
         self.set_weight_grads()
         return self.xs[0]
 
