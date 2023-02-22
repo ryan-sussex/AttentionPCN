@@ -45,6 +45,7 @@ class PCN(object):
 
     def propagate_xs(self):
         for l in range(1, self.n_layers):
+            print(l)
             self.xs[l] = self.network[l - 1](self.xs[l - 1])
 
     def infer(
@@ -68,23 +69,34 @@ class PCN(object):
         if test:
             self.reset_xs(prior, init_std)
         self.set_obs(obs)
+        print("obs", obs.size())
 
         for t in range(n_iters):
             self.network.zero_grad()
             self.preds[-1] = self.network[self.n_layers -
                                           1](self.xs[self.n_layers - 1])
+            # print(self.preds[-1].size())
+            # print(self.xs[-1].size())
             self.errs[-1] = self.xs[-1] - self.preds[-1]
 
             for l in reversed(range(1, self.n_layers)):
                 # Create predictions (activities)
-                self.preds[l] = self.network[l - 1](self.xs[l - 1])
+                self.preds[l] = self.network[l-1](self.xs[l - 1], z=self.xs[l])
+                self.errs[l] = - torch.logsumexp(self.network[l-1][0].errs, dim=1)
+                print("log sum exp:", self.errs[l].size())
+                print(self.errs[l])
+        
+                # probs = self.network[l-1].get_probabilities(self.xs[l - 1], self.xs[l])
+                # self.preds[l] = self.network[l - 1](self.xs[l - 1], self.xs[l])
                 # Create errors
-                self.errs[l] = self.xs[l] - self.preds[l]
                 # Calculate gradient
+                # dFdx =
+                # dFdy
                 _, epsdfdx = torch.autograd.functional.vjp(
                     self.network[l], self.xs[l], self.errs[l + 1])
                 with torch.no_grad():
                     # Update x using gradient.
+                    # dx = probs
                     dx = epsdfdx - self.errs[l]
                     self.xs[l] = self.xs[l] + self.dt * dx
 

@@ -5,27 +5,28 @@ from torch.utils.data import DataLoader
 from dataset import MNIST
 from utils import get_device, set_seed, save_run, accuracy
 from pcn import PCN
+from layers import AttentionLayer, SequentialAttention
 
 # Training Params
 LR = 1e-4
 BATCH_SIZE = 64
-N_EPOCHS = 2
+N_EPOCHS = 1
 # Inference Params
-INFERENCE_LR = 0.01
-INFERENCE_ITERS_TRAIN = 10
+INFERENCE_LR = 0.05
+INFERENCE_ITERS_TRAIN = 5
 INFERENCE_ITERS_TEST = 200
 
 
 NETWORK = nn.Sequential(
-    nn.Sequential(
-        nn.Linear(10, 250),
+    SequentialAttention(
+        AttentionLayer(10, 250),
         # nn.Tanh()
     ),
-    nn.Sequential(
-        nn.Linear(250, 250),
+    SequentialAttention(
+        AttentionLayer(250, 250),
         # nn.Tanh()
     ),
-    nn.Linear(250, 28*28)
+    AttentionLayer(250, 28*28)
 )
 
 
