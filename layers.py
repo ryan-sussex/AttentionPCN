@@ -30,21 +30,19 @@ class AttentionLayer(nn.Linear):
         z (torch.Tensor): [batch_dim, out_features]
         """
         # weight = self.weight.reshape(self.real_out_features, self.in_features, self.n_options)
-        
+
         # weight = torch.mean(weight, dim=-1)
         # print(weight.size())
         # print(input.size())
         # return F.linear(input, weight, self.bias)
-    
+
         # probs, preds = self.get_probabilities(input, z)
         preds = self.multiple_predictions(input)
         if z is None:
             average = torch.mean(preds, dim=-1)
             print(average.size())
             return average
-        print("HERE")
         self.errs = self.get_errors(preds, z)
-        print("errs", self.errs.size())
         probs = torch.softmax(self.errs, dim=1)
         return preds @ probs
 
@@ -54,16 +52,18 @@ class AttentionLayer(nn.Linear):
         # input = input.reshape(-1, self.in_features)
         pred = F.linear(input, self.weight, self.bias)  # [batch_size, out_features * n_probs]
         pred = pred.reshape(-1, self.real_out_features, self.n_options)  # [batch_size, out_features, n_probs]
-        print("pred", pred.shape)
         return pred
 
     def get_errors(self, pred: Tensor, z: Optional[Tensor]):
-        print(pred.size())
-        print(z.size())
         z = z[:, :, None].reshape(-1, 1, self.real_out_features)
         pred = pred.reshape(-1, self.n_options, self.real_out_features)
         errs = torch.cdist(pred, z) # [batch_size, n_probs]
         return errs
+
+    def error(self, input, z):
+        pred = self.multiple_predictions(input)
+        errs = self.get_errors(pred, z)
+        return torch.logsumexp(errs, dim=1)
 
 
 class SequentialAttention(nn.Sequential):

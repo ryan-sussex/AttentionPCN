@@ -69,7 +69,6 @@ class PCN(object):
         if test:
             self.reset_xs(prior, init_std)
         self.set_obs(obs)
-        print("obs", obs.size())
 
         for t in range(n_iters):
             self.network.zero_grad()
@@ -82,22 +81,18 @@ class PCN(object):
             for l in reversed(range(1, self.n_layers)):
                 # Create predictions (activities)
                 self.preds[l] = self.network[l-1](self.xs[l - 1], z=self.xs[l])
+                err_func = (
+                    lambda x: self.network[l-1][0].error(self.xs[l-1], x)
+                )
                 self.errs[l] = - torch.logsumexp(self.network[l-1][0].errs, dim=1)
-                print("log sum exp:", self.errs[l].size())
-                print(self.errs[l])
-        
-                # probs = self.network[l-1].get_probabilities(self.xs[l - 1], self.xs[l])
-                # self.preds[l] = self.network[l - 1](self.xs[l - 1], self.xs[l])
-                # Create errors
-                # Calculate gradient
-                # dFdx =
-                # dFdy
+                print("errors:", self.errs[l].size())
+                print("preds:", self.preds[l].size())
                 _, epsdfdx = torch.autograd.functional.vjp(
-                    self.network[l], self.xs[l], self.errs[l + 1])
+                    err_func, self.xs[l], self.errs[l])
+
                 with torch.no_grad():
                     # Update x using gradient.
-                    # dx = probs
-                    dx = epsdfdx - self.errs[l]
+                    dx = epsdfdx
                     self.xs[l] = self.xs[l] + self.dt * dx
 
             if test:  # In test mode we need to update the first layer
