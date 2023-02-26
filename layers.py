@@ -29,27 +29,15 @@ class AttentionLayer(nn.Linear):
         input (torch.Tensor): [batch_dim, in_features]
         z (torch.Tensor): [batch_dim, out_features]
         """
-        # weight = self.weight.reshape(self.real_out_features, self.in_features, self.n_options)
-
-        # weight = torch.mean(weight, dim=-1)
-        # print(weight.size())
-        # print(input.size())
-        # return F.linear(input, weight, self.bias)
-
-        # probs, preds = self.get_probabilities(input, z)
         preds = self.multiple_predictions(input)
         if z is None:
             average = torch.mean(preds, dim=-1)
-            print(average.size())
             return average
         self.errs = self.get_errors(preds, z)
         probs = torch.softmax(self.errs, dim=1)
         return preds @ probs
 
     def multiple_predictions(self, input: torch.Tensor) -> torch.Tensor:
-        # input = input[:, :, None]
-        # input = input.expand(-1, -1, self.n_options)
-        # input = input.reshape(-1, self.in_features)
         pred = F.linear(input, self.weight, self.bias)  # [batch_size, out_features * n_probs]
         pred = pred.reshape(-1, self.real_out_features, self.n_options)  # [batch_size, out_features, n_probs]
         return pred
@@ -60,10 +48,26 @@ class AttentionLayer(nn.Linear):
         errs = torch.cdist(pred, z) # [batch_size, n_probs]
         return errs
 
-    def error(self, input, z):
+    def error(self, input: torch.Tensor, z: torch.Tensor):
+        """
+        Parameters
+        ----------
+        input (torch.Tensor): [batch_dim, in_features]
+        z (torch.Tensor): [batch_dim, out_features]
+
+        Returns
+        ---------
+        (torch.Tensor): [batch_size, n_maps]
+        """
         pred = self.multiple_predictions(input)
         errs = self.get_errors(pred, z)
-        return torch.logsumexp(errs, dim=1)
+        return errs
+
+    TEMPERATURE = 1
+    def free_energy_func(self, x, z):
+        _, n_dims = x.shape
+        errors = torch.cdist(x, self.multiple_predictions(z).reshape(-1, n_dims))
+        return - torch.logsumexp(- self.TEMPERATURE * errors, dim=1)
 
 
 class SequentialAttention(nn.Sequential):

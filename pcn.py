@@ -1,5 +1,6 @@
 from typing import Union
 import torch
+from layers import AttentionLayer
 
 
 class PCN(object):
@@ -45,7 +46,6 @@ class PCN(object):
 
     def propagate_xs(self):
         for l in range(1, self.n_layers):
-            print(l)
             self.xs[l] = self.network[l - 1](self.xs[l - 1])
 
     def infer(
@@ -74,26 +74,30 @@ class PCN(object):
             self.network.zero_grad()
             self.preds[-1] = self.network[self.n_layers -
                                           1](self.xs[self.n_layers - 1])
-            # print(self.preds[-1].size())
-            # print(self.xs[-1].size())
             self.errs[-1] = self.xs[-1] - self.preds[-1]
 
             for l in reversed(range(1, self.n_layers)):
                 # Create predictions (activities)
-                self.preds[l] = self.network[l-1](self.xs[l - 1], z=self.xs[l])
-                err_func = (
-                    lambda x: self.network[l-1][0].error(self.xs[l-1], x)
-                )
-                self.errs[l] = - torch.logsumexp(self.network[l-1][0].errs, dim=1)
-                print("errors:", self.errs[l].size())
-                print("preds:", self.preds[l].size())
-                _, epsdfdx = torch.autograd.functional.vjp(
-                    err_func, self.xs[l], self.errs[l])
+                # self.preds[l] = self.network[l-1](self.xs[l - 1], z=self.xs[l])
+                # err_func = (
+                #     lambda x: self.network[l-1][0].error(self.xs[l-1], x)
+                # )
+                # self.errs[l] = - torch.logsumexp(
+                #     self.network[l-1][0].errs, dim=1
+                # )
+                attention_layer: AttentionLayer = self.network[l-1][0]
+                forward = lambda x: attention_layer.free_energy_func(x, self.xs[l-1])
+                backward =  lambda z: attention_layer.free_energy_func(self.xs[l], z)
+
+
+                # Let vjp calculate the implicit attention weighted sum
+                free_energy, epsdfdx = torch.autograd.functional.vjp(forward, self.xs[l])
+                free_energy, epsdfdz = torch.autograd.functional.vjp(backward, self.xs[l-1])
 
                 with torch.no_grad():
-                    # Update x using gradient.
-                    dx = epsdfdx
-                    self.xs[l] = self.xs[l] + self.dt * dx
+                    self.xs[l] = self.xs[l] + self.dt * epsdfdx
+                    self.xs[l-1] = self.xs[l-1] + self.dt * epsdfdz
+
 
             if test:  # In test mode we need to update the first layer
                 _, epsdfdx = torch.autograd.functional.vjp(
@@ -110,6 +114,7 @@ class PCN(object):
     def set_weight_grads(self):
         for l in range(self.n_layers):
             for w in self.network[l].parameters():
+                continue
                 dw = torch.autograd.grad(
                     self.preds[l + 1],
                     w,
