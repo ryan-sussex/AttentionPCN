@@ -26,6 +26,7 @@ class PCN(object):
         self.preds = [None] * self.n_nodes
         self.errs = [None] * self.n_nodes
         self.xs = [None] * self.n_nodes
+        self.free_energy = [None] * self.n_nodes
 
     def reset_xs(self, prior, init_std):
         self.set_prior(prior)
@@ -89,11 +90,11 @@ class PCN(object):
                 forward = lambda x: attention_layer.free_energy_func(x, self.xs[l-1])
                 backward =  lambda z: attention_layer.free_energy_func(self.xs[l], z)
 
-
                 # Let vjp calculate the implicit attention weighted sum
-                free_energy, epsdfdx = torch.autograd.functional.vjp(forward, self.xs[l])
-                free_energy, epsdfdz = torch.autograd.functional.vjp(backward, self.xs[l-1])
-
+                free_energy_a, epsdfdx = torch.autograd.functional.vjp(forward, self.xs[l], v=torch.ones((self.xs[l].size(0), 1), device=self.device))
+                free_energy_b, epsdfdz = torch.autograd.functional.vjp(backward, self.xs[l-1], v=torch.ones((self.xs[l-1].size(0), 1), device=self.device))
+                assert free_energy_a == free_energy_b
+                self.free_energy[l] = free_energy_a
                 with torch.no_grad():
                     self.xs[l] = self.xs[l] + self.dt * epsdfdx
                     self.xs[l-1] = self.xs[l-1] + self.dt * epsdfdz
@@ -105,8 +106,8 @@ class PCN(object):
                 with torch.no_grad():
                     self.xs[0] = self.xs[0] + self.dt * epsdfdx
 
-            if (t+1) != n_iters:
-                self.clear_grads()
+            # if (t+1) != n_iters:
+            #     self.clear_grads()
 
         self.set_weight_grads()
         return self.xs[0]
@@ -114,6 +115,9 @@ class PCN(object):
     def set_weight_grads(self):
         for l in range(self.n_layers):
             for w in self.network[l].parameters():
+                # switch to functorch
+                # func, params = functorch.make_functional(layer)
+                # use some autograd..
                 continue
                 dw = torch.autograd.grad(
                     self.preds[l + 1],

@@ -63,11 +63,15 @@ class AttentionLayer(nn.Linear):
         errs = self.get_errors(pred, z)
         return errs
 
-    TEMPERATURE = 1
-    def free_energy_func(self, x, z):
-        _, n_dims = x.shape
-        errors = torch.cdist(x, self.multiple_predictions(z).reshape(-1, n_dims))
-        return - torch.logsumexp(- self.TEMPERATURE * errors, dim=1)
+    def free_energy_func(self, x: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
+        TEMPERATURE = 1
+        n_batch, n_dims = x.shape
+        x = x[:, None, :]
+        errors = torch.cdist(x, self.multiple_predictions(z).reshape(n_batch, self.n_options, n_dims))
+        # print(x.size())
+        # print(self.multiple_predictions(z).size())
+        # print(errors.size())
+        return - torch.logsumexp(- TEMPERATURE * errors, dim=2)
 
 
 class SequentialAttention(nn.Sequential):
