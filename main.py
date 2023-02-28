@@ -8,25 +8,20 @@ from pcn import PCN
 from layers import AttentionLayer, SequentialAttention
 
 # Training Params
-LR = 1e-7
+LR = 1e-4
 BATCH_SIZE = 64
 N_EPOCHS = 1
 # Inference Params
-INFERENCE_LR = 0.05
-INFERENCE_ITERS_TRAIN = 500
-INFERENCE_ITERS_TEST = 200
+INFERENCE_LR = 0.005
+INFERENCE_ITERS_TRAIN = 10
+INFERENCE_ITERS_TEST = 100
+TEMPERATURE = 1
 
 
 NETWORK = nn.Sequential(
-    SequentialAttention(
-        AttentionLayer(10, 250),
-        # nn.Tanh()
-    ),
-    SequentialAttention(
-        AttentionLayer(250, 250),
-        # nn.Tanh()
-    ),
-    AttentionLayer(250, 28*28)
+        AttentionLayer(10, 250, n_options=1, temperature=1),
+        AttentionLayer(250, 250, n_options=10, temperature=1),
+        AttentionLayer(250, 28*28, n_options=1, temperature=1)
 )
 
 
@@ -87,6 +82,13 @@ def train(seed):
                 test=True
             )
             test_loss += model.loss
+            if batch_id % log_every == 0:
+                print(
+                    f"Test loss: {model.loss:.5f}"
+                    f"[{batch_id * len(img_batch)}/"
+                    f"{len(train_loader.dataset)}]"
+                )
+
             test_acc += accuracy(label_preds, label_batch)
 
         train_losses.append(train_loss / len(train_loader))

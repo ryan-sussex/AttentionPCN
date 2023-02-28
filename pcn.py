@@ -6,21 +6,14 @@ from layers import AttentionLayer
 
 
 class PCN(object):
-
     def __init__(
-        self,
-        network: nn.Sequential,
-        dt: float = 0.01,
-        device: Union[str, int] = "cpu"
+        self, network: nn.Sequential, dt: float = 0.01, device: Union[str, int] = "cpu"
     ):
-
         self.network = network.to(device)
         self.n_layers = len(self.network)
         self.n_nodes = self.n_layers + 1
         self.dt = dt
-        self.n_params = sum(
-            p.numel() for p in network.parameters() if p.requires_grad
-        )
+        self.n_params = sum(p.numel() for p in network.parameters() if p.requires_grad)
         self.device = device
 
     def reset(self):
@@ -35,8 +28,11 @@ class PCN(object):
         self.propagate_xs()
         for l in range(self.n_layers):
             # Doesn't this just overwrite the first two lines?
-            self.xs[l] = torch.empty(self.xs[l].shape).normal_(
-                mean=0, std=init_std).to(self.device)
+            self.xs[l] = (
+                torch.empty(self.xs[l].shape)
+                .normal_(mean=0, std=init_std)
+                .to(self.device)
+            )
 
     def set_obs(self, obs):
         self.xs[-1] = obs.clone()
@@ -57,7 +53,7 @@ class PCN(object):
         prior: torch.Tensor,
         n_iters: int,
         init_std: float = 0.05,
-        test: bool = False
+        test: bool = False,
     ) -> torch.Tensor:
         """
         Runs n_iters of inference updates, calculating prediction errrors at
@@ -75,59 +71,54 @@ class PCN(object):
 
         for t in range(n_iters):
             self.network.zero_grad()
-            self.preds[-1] = self.network[self.n_layers -
-                                          1](self.xs[self.n_layers - 1])
-            self.errs[-1] = self.xs[-1] - self.preds[-1]
+            # self.preds[-1] = self.network[self.n_layers - 1](self.xs[self.n_layers - 1])
+            # self.errs[-1] = self.xs[-1] - self.preds[-1]
 
-            for l in reversed(range(1, self.n_layers)):
-                # Create predictions (activities)
-                attention_layer: AttentionLayer = self.network[l-1][0]
-
+            for l in reversed(range(1, self.n_layers + 1)):
+                attention_layer: AttentionLayer = self.network[l - 1]
                 # Let vjp calculate the implicit attention weighted sum
-                free_energy, grads = (
-                    torch.autograd.functional\
-                        .vjp(
-                        attention_layer.free_energy_func, 
-                        (self.xs[l], self.xs[l-1]),
-                        v=torch.ones(
-                            (self.xs[l].size(0), 1), 
-                            device=self.device
-                        )
-                    )
+                free_energy, grads = torch.autograd.functional.vjp(
+                    attention_layer.free_energy_func,
+                    (self.xs[l], self.xs[l - 1]),
+                    v=torch.ones((self.xs[l].size(0), 1), device=self.device),
                 )
                 epsdfdx, epsdfdz = grads
                 self.errs[l] = free_energy
 
                 with torch.no_grad():
                     self.xs[l] = self.xs[l] - self.dt * epsdfdx
-                    self.xs[l-1] = self.xs[l-1] - self.dt * epsdfdz
+                    if (l == 1) and not test:
+                        # If in test mode update prior
+                        continue
+                    self.xs[l - 1] = self.xs[l - 1] - self.dt * epsdfdz
 
+            # if test:  # In test mode we need to update the first layer
+            #     _, epsdfdx = torch.autograd.functional.vjp(
+            #         self.network[0], self.xs[0], self.errs[1]
+            #     )
+            #     with torch.no_grad():
+            #         self.xs[0] = self.xs[0] + self.dt * epsdfdx
 
-            if test:  # In test mode we need to update the first layer
-                _, epsdfdx = torch.autograd.functional.vjp(
-                    self.network[0], self.xs[0], self.errs[1])
-                with torch.no_grad():
-                    self.xs[0] = self.xs[0] + self.dt * epsdfdx
-
-            if (t+1) != n_iters:
+            if (t + 1) != n_iters:
                 self.clear_grads()
+
         self.set_weight_grads()
         return self.xs[0]
 
     def set_weight_grads(self):
-        for l in range(1, self.n_layers):
-            attention_layer: AttentionLayer = self.network[l-1][0]
-            for w in self.network[l-1].parameters():
+        for l in range(self.n_layers):
+            attention_layer: AttentionLayer = self.network[l]
+            for w in self.network[l].parameters():
                 w: torch.Tensor
-                preds = attention_layer.multiple_predictions(self.xs[l-1])
-                fe = attention_layer._free_energy_from_preds(self.xs[l], preds)
+                preds = attention_layer.multiple_predictions(self.xs[l])
+                fe = attention_layer._free_energy_from_preds(self.xs[l+1], preds)
                 dw = torch.autograd.grad(
                     fe.sum(),
                     w,
                     allow_unused=True,
                     retain_graph=True,
                 )[0]
-                w.grad = - dw.clone()
+                w.grad = dw.clone()
 
     def zero_grad(self):
         self.network.zero_grad()
@@ -150,7 +141,7 @@ class PCN(object):
 
     @property
     def loss(self) -> float:
-        return (self.errs[-1]**2).mean().item()
+        return (self.errs[-1] ** 2).mean().item()
 
     def __str__(self):
         return f"PCN(\n{self.network}\n"
