@@ -8,14 +8,14 @@ import torch.nn.functional as F
 
 class AttentionLayer(nn.Linear):
     def __init__(
-            self,
-            in_features: int,
-            out_features: int,
-            bias: bool = False,
-            n_options: int = 2,
-            temperature: int = 1,
-            device=None,
-            dtype=None
+        self,
+        in_features: int,
+        out_features: int,
+        bias: bool = False,
+        n_options: int = 2,
+        temperature: int = 1,
+        device=None,
+        dtype=None,
     ) -> None:
         self.n_options = n_options
         self.real_out_features = out_features
@@ -62,22 +62,29 @@ class AttentionLayer(nn.Linear):
         self.errs = torch.cdist(x, predictions)
         # Calculate free energy based on log sum exp of errrors
         inv_T = 1 / self.temperature
-        return - inv_T * torch.logsumexp(- self.temperature * self.errs, dim=2)
+        return -inv_T * torch.logsumexp(-self.temperature * self.errs, dim=2)
 
 
 class GMMLayer(AttentionLayer):
-
     def __init__(
-            self,
-            in_features: int,
-            out_features: int,
-            bias: bool = False,
-            n_options: int = 2,
-            temperature: int = 1,
-            device=None,
-            dtype=None
-        ) -> None:
-        super().__init__(in_features, out_features, bias, n_options, temperature, device, dtype)
+        self,
+        in_features: int,
+        out_features: int,
+        bias: bool = False,
+        n_options: int = 2,
+        temperature: int = 1,
+        device=None,
+        dtype=None,
+    ) -> None:
+        super().__init__(
+            in_features,
+            out_features,
+            bias,
+            n_options,
+            temperature,
+            device,
+            dtype
+        )
         nn.Linear.__init__(self, in_features, self.real_out_features)
         self.n_options = in_features
 

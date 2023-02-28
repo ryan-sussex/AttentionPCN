@@ -92,14 +92,8 @@ class PCN(object):
                         continue
                     self.xs[l - 1] = self.xs[l - 1] - self.dt * epsdfdz
 
-
             if (t + 1) != n_iters:
                 self.clear_grads()
-
-        if test:
-            print(f"true label {prior[0]}")
-            print(self.xs[0][0])
-            print("\n")
 
         self.set_weight_grads()
         return self.xs[0]
