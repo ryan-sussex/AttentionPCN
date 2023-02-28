@@ -51,17 +51,26 @@ class AttentionLayer(nn.Linear):
         # [batch_size, out_features, n_probs]
         return pred
 
+    def _free_energy_from_preds(self, obs, predictions):
+        # Fiddling with shapes
+        n_batch, n_dims = obs.shape
+        obs = obs[:, None, :]
+        predictions = predictions.reshape(n_batch, self.n_options, n_dims)
+        # Calculate the error for each different prediction
+        self.errs = torch.cdist(obs, predictions)
+        # Calculate free energy based on log sum exp of errrors
+        return - torch.logsumexp(- self.temperature * self.errs, dim=2)
+   
+
     def free_energy_func(
                 self, 
                 x: Tensor, 
                 z: Tensor,
-        ) -> Tensor:
-        n_batch, n_dims = x.shape
-        x = x[:, None, :]
+                # forward_func: 
+    ) -> Tensor:
+        # Make multiple predictions
         predictions = self.multiple_predictions(z)
-        predictions = predictions.reshape(n_batch, self.n_options, n_dims)
-        self.errs = torch.cdist(x, predictions)
-        return - torch.logsumexp(- self.temperature * self.errs, dim=2)
+        return self._free_energy_from_preds(x, predictions)
 
 
 class SequentialAttention(nn.Sequential):

@@ -79,25 +79,23 @@ class PCN(object):
 
             for l in reversed(range(1, self.n_layers)):
                 # Create predictions (activities)
-                # self.preds[l] = self.network[l-1](self.xs[l - 1], z=self.xs[l])
-                # err_func = (
-                #     lambda x: self.network[l-1][0].error(self.xs[l-1], x)
-                # )
-                # self.errs[l] = - torch.logsumexp(
-                #     self.network[l-1][0].errs, dim=1
-                # )
                 attention_layer: AttentionLayer = self.network[l-1][0]
-                forward = lambda x: attention_layer.free_energy_func(x, self.xs[l-1])
-                backward =  lambda z: attention_layer.free_energy_func(self.xs[l], z)
 
                 # Let vjp calculate the implicit attention weighted sum
-                free_energy_a, epsdfdx = torch.autograd.functional.vjp(forward, self.xs[l], v=torch.ones((self.xs[l].size(0), 1), device=self.device))
-                free_energy_b, epsdfdz = torch.autograd.functional.vjp(backward, self.xs[l-1], v=torch.ones((self.xs[l-1].size(0), 1), device=self.device))
-                assert free_energy_a == free_energy_b
-                self.free_energy[l] = free_energy_a
+                free_energy, grads = (
+                    torch.autograd.functional\
+                        .vjp(
+                    attention_layer.free_energy_func, 
+                    (self.xs[l], self.xs[l-1]),
+                    v=torch.ones((self.xs[l].size(0), 1), 
+                    device=self.device)
+                    )
+                )
+                epsdfdx, epsdfdz = grads
+                self.errs[l] = free_energy
                 with torch.no_grad():
-                    self.xs[l] = self.xs[l] + self.dt * epsdfdx
-                    self.xs[l-1] = self.xs[l-1] + self.dt * epsdfdz
+                    self.xs[l] = self.xs[l] - self.dt * epsdfdx
+                    self.xs[l-1] = self.xs[l-1] - self.dt * epsdfdz
 
 
             if test:  # In test mode we need to update the first layer
@@ -106,27 +104,29 @@ class PCN(object):
                 with torch.no_grad():
                     self.xs[0] = self.xs[0] + self.dt * epsdfdx
 
-            # if (t+1) != n_iters:
-            #     self.clear_grads()
+            if (t+1) != n_iters:
+                self.clear_grads()
 
         self.set_weight_grads()
         return self.xs[0]
 
     def set_weight_grads(self):
-        for l in range(self.n_layers):
-            for w in self.network[l].parameters():
-                # switch to functorch
-                # func, params = functorch.make_functional(layer)
-                # use some autograd..
-                continue
+        for l in range(1, self.n_layers):
+            attention_layer: AttentionLayer = self.network[l-1][0]
+            for w in self.network[l-1].parameters():
+                w: torch.Tensor
+                preds = attention_layer.multiple_predictions(self.xs[l-1])
+                fe = attention_layer._free_energy_from_preds(self.xs[l], preds)
+                # assert w.requires_grad
+                # print(fe.size())
                 dw = torch.autograd.grad(
-                    self.preds[l + 1],
+                    fe.sum(),
                     w,
-                    - self.errs[l + 1],
                     allow_unused=True,
-                    retain_graph=True
+                    retain_graph=True,
+                    # is_grads_batched=True
                 )[0]
-                w.grad = dw.clone()
+                w.grad = - dw.clone()
 
     def zero_grad(self):
         self.network.zero_grad()
@@ -140,9 +140,10 @@ class PCN(object):
     def clear_grads(self):
         with torch.no_grad():
             for l in range(1, self.n_nodes):
-                self.preds[l] = self.preds[l].clone()
+                # self.preds[l] = self.preds[l].clone()
                 self.errs[l] = self.errs[l].clone()
                 self.xs[l] = self.xs[l].clone()
+                # assert self.errs[l].requires_grad
 
     # @property
     # def free_energy(self) -> float:
