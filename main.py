@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from dataset import MNIST
 from utils import get_device, set_seed, save_run, accuracy
 from pcn import PCN
-from layers import AttentionLayer
+from layers import AttentionLayer, GMMLayer
 
 # Training Params
 LR = 1e-4
@@ -19,8 +19,7 @@ INFERENCE_ITERS_TEST = 100
 
 
 NETWORK = nn.Sequential(
-        AttentionLayer(10, 10, n_options=10, temperature=TEMPERATURE),
-        AttentionLayer(10, 250, n_options=1, temperature=TEMPERATURE),
+        GMMLayer(10, 250, n_options=1, temperature=TEMPERATURE),
         AttentionLayer(250, 250, n_options=1, temperature=TEMPERATURE),
         AttentionLayer(250, 28*28, n_options=1, temperature=TEMPERATURE)
 )

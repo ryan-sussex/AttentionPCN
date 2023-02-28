@@ -63,3 +63,29 @@ class AttentionLayer(nn.Linear):
         # Calculate free energy based on log sum exp of errrors
         inv_T = 1 / self.temperature
         return - inv_T * torch.logsumexp(- self.temperature * self.errs, dim=2)
+
+
+class GMMLayer(AttentionLayer):
+
+    def __init__(
+            self,
+            in_features: int,
+            out_features: int,
+            bias: bool = False,
+            n_options: int = 2,
+            temperature: int = 1,
+            device=None,
+            dtype=None
+        ) -> None:
+        super().__init__(in_features, out_features, bias, n_options, temperature, device, dtype)
+        nn.Linear.__init__(self, in_features, self.real_out_features)
+        self.n_options = in_features
+
+    def multiple_predictions(self, input: Tensor) -> Tensor:
+        mask = torch.eye(input.size(1))
+        preds = [
+            F.linear(input * mask[i, :], self.weight, self.bias)
+            for i in range(mask.shape[1])
+        ]
+        preds = torch.stack(preds)
+        return preds.reshape(-1, self.real_out_features, self.n_options)
