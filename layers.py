@@ -45,39 +45,21 @@ class AttentionLayer(nn.Linear):
         return preds @ probabilities
 
     def multiple_predictions(self, input: Tensor) -> Tensor:
-        pred = F.linear(input, self.weight, self.bias)  
+        pred = F.linear(input, self.weight, self.bias)
         # [batch_size, out_features * n_probs]
-        pred = pred.reshape(-1, self.real_out_features, self.n_options)  
+        pred = pred.reshape(-1, self.real_out_features, self.n_options)
         # [batch_size, out_features, n_probs]
         return pred
 
-    def _free_energy_from_preds(self, obs, predictions):
-        # Fiddling with shapes
-        n_batch, n_dims = obs.shape
-        obs = obs[:, None, :]
-        predictions = predictions.reshape(n_batch, self.n_options, n_dims)
-        # Calculate the error for each different prediction
-        self.errs = torch.cdist(obs, predictions)
-        # Calculate free energy based on log sum exp of errrors
-        return - torch.logsumexp(- self.temperature * self.errs, dim=2)
-   
-
-    def free_energy_func(
-                self, 
-                x: Tensor, 
-                z: Tensor,
-                # forward_func: 
-    ) -> Tensor:
+    def free_energy_func(self, x: Tensor, z: Tensor) -> Tensor:
         # Make multiple predictions
         predictions = self.multiple_predictions(z)
-        return self._free_energy_from_preds(x, predictions)
-
-
-class SequentialAttention(nn.Sequential):
-    def __init_subclass__(cls) -> None:
-        return super().__init_subclass__()
-
-    def forward(self, input, **kwargs):
-        for module in self:
-            input = module(input, **kwargs)
-        return input
+        # Fiddling with shapes
+        n_batch, n_dims = x.shape
+        x = x[:, None, :]
+        predictions = predictions.reshape(n_batch, self.n_options, n_dims)
+        # Calculate the error for each different prediction
+        self.errs = torch.cdist(x, predictions)
+        # Calculate free energy based on log sum exp of errrors
+        inv_T = 1 / self.temperature
+        return - inv_T * torch.logsumexp(- self.temperature * self.errs, dim=2)

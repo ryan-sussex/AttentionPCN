@@ -71,8 +71,6 @@ class PCN(object):
 
         for t in range(n_iters):
             self.network.zero_grad()
-            # self.preds[-1] = self.network[self.n_layers - 1](self.xs[self.n_layers - 1])
-            # self.errs[-1] = self.xs[-1] - self.preds[-1]
 
             for l in reversed(range(1, self.n_layers + 1)):
                 attention_layer: AttentionLayer = self.network[l - 1]
@@ -86,18 +84,13 @@ class PCN(object):
                 self.errs[l] = free_energy
 
                 with torch.no_grad():
-                    self.xs[l] = self.xs[l] - self.dt * epsdfdx
+                    if not l == (self.n_nodes - 1):
+                        # Never update the observations
+                        self.xs[l] = self.xs[l] - self.dt * epsdfdx
                     if (l == 1) and not test:
-                        # If in test mode update prior
+                        # If in train mode prior is fixed as known label
                         continue
                     self.xs[l - 1] = self.xs[l - 1] - self.dt * epsdfdz
-
-            # if test:  # In test mode we need to update the first layer
-            #     _, epsdfdx = torch.autograd.functional.vjp(
-            #         self.network[0], self.xs[0], self.errs[1]
-            #     )
-            #     with torch.no_grad():
-            #         self.xs[0] = self.xs[0] + self.dt * epsdfdx
 
             if (t + 1) != n_iters:
                 self.clear_grads()
@@ -108,10 +101,8 @@ class PCN(object):
     def set_weight_grads(self):
         for l in range(self.n_layers):
             attention_layer: AttentionLayer = self.network[l]
+            fe = attention_layer.free_energy_func(self.xs[l+1], self.xs[l])
             for w in self.network[l].parameters():
-                w: torch.Tensor
-                preds = attention_layer.multiple_predictions(self.xs[l])
-                fe = attention_layer._free_energy_from_preds(self.xs[l+1], preds)
                 dw = torch.autograd.grad(
                     fe.sum(),
                     w,
@@ -135,13 +126,12 @@ class PCN(object):
                 self.errs[l] = self.errs[l].clone()
                 self.xs[l] = self.xs[l].clone()
 
-    # @property
-    # def free_energy(self) -> float:
-    #     return (self.errs **2).mean().item()
+    def average_free_energy(self, layer) -> float:
+        return (self.errs[layer]).mean().item()
 
     @property
     def loss(self) -> float:
-        return (self.errs[-1] ** 2).mean().item()
+        return self.average_free_energy(-1)
 
     def __str__(self):
         return f"PCN(\n{self.network}\n"

@@ -5,23 +5,24 @@ from torch.utils.data import DataLoader
 from dataset import MNIST
 from utils import get_device, set_seed, save_run, accuracy
 from pcn import PCN
-from layers import AttentionLayer, SequentialAttention
+from layers import AttentionLayer
 
 # Training Params
 LR = 1e-4
 BATCH_SIZE = 64
-N_EPOCHS = 1
+N_EPOCHS = 5
 # Inference Params
-INFERENCE_LR = 0.005
-INFERENCE_ITERS_TRAIN = 10
-INFERENCE_ITERS_TEST = 100
 TEMPERATURE = 1
+INFERENCE_LR = 0.005
+INFERENCE_ITERS_TRAIN = 20
+INFERENCE_ITERS_TEST = 100
 
 
 NETWORK = nn.Sequential(
-        AttentionLayer(10, 250, n_options=1, temperature=1),
-        AttentionLayer(250, 250, n_options=10, temperature=1),
-        AttentionLayer(250, 28*28, n_options=1, temperature=1)
+        AttentionLayer(10, 10, n_options=10, temperature=TEMPERATURE),
+        AttentionLayer(10, 250, n_options=1, temperature=TEMPERATURE),
+        AttentionLayer(250, 250, n_options=1, temperature=TEMPERATURE),
+        AttentionLayer(250, 28*28, n_options=1, temperature=TEMPERATURE)
 )
 
 
@@ -65,7 +66,12 @@ def train(seed):
 
             if batch_id % log_every == 0:
                 print(
-                    f"Train loss: {model.loss:.5f}"
+                    f"Train reconstruction loss: {model.loss:.5f}"
+                    f"[{batch_id * len(img_batch)}/"
+                    f"{len(train_loader.dataset)}]"
+                )
+                print(
+                    f"Train label loss: {model.average_free_energy(1):.5f}"
                     f"[{batch_id * len(img_batch)}/"
                     f"{len(train_loader.dataset)}]"
                 )
@@ -84,7 +90,12 @@ def train(seed):
             test_loss += model.loss
             if batch_id % log_every == 0:
                 print(
-                    f"Test loss: {model.loss:.5f}"
+                    f"Test reconstruction loss: {model.loss:.5f}"
+                    f"[{batch_id * len(img_batch)}/"
+                    f"{len(train_loader.dataset)}]"
+                )
+                print(
+                    f"Test label loss: {model.average_free_energy(1):.5f}"
                     f"[{batch_id * len(img_batch)}/"
                     f"{len(train_loader.dataset)}]"
                 )
