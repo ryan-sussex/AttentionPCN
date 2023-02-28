@@ -13,65 +13,55 @@ class AttentionLayer(nn.Linear):
             out_features: int,
             bias: bool = False,
             n_options: int = 2,
+            temperature: int = 1,
             device=None,
             dtype=None
     ) -> None:
         self.n_options = n_options
         self.real_out_features = out_features
         out_features = n_options * out_features
-        self.errs = None
+        self.temperature = temperature
         super().__init__(in_features, out_features, bias, device, dtype)
 
-    def forward(self, input: Tensor, z: Optional[Tensor] = None) -> Tensor:
+    def forward(
+            self,
+            input: Tensor,
+            probabilities: Optional[Tensor] = None
+    ) -> Tensor:
         """
         Parameters
         ----------
-        input (torch.Tensor): [batch_dim, in_features]
-        z (torch.Tensor): [batch_dim, out_features]
-        """
-        preds = self.multiple_predictions(input)
-        if z is None:
-            average = torch.mean(preds, dim=-1)
-            return average
-        self.errs = self.get_errors(preds, z)
-        probs = torch.softmax(self.errs, dim=1)
-        return preds @ probs
-
-    def multiple_predictions(self, input: torch.Tensor) -> torch.Tensor:
-        pred = F.linear(input, self.weight, self.bias)  # [batch_size, out_features * n_probs]
-        pred = pred.reshape(-1, self.real_out_features, self.n_options)  # [batch_size, out_features, n_probs]
-        return pred
-
-    def get_errors(self, pred: Tensor, z: Optional[Tensor]):
-        z = z[:, :, None].reshape(-1, 1, self.real_out_features)
-        pred = pred.reshape(-1, self.n_options, self.real_out_features)
-        errs = torch.cdist(pred, z) # [batch_size, n_probs]
-        return errs
-
-    def error(self, input: torch.Tensor, z: torch.Tensor):
-        """
-        Parameters
-        ----------
-        input (torch.Tensor): [batch_dim, in_features]
-        z (torch.Tensor): [batch_dim, out_features]
+        input (Tensor): [batch_dim, in_features]
+        probabilities (Tensor): [batch_dim, n_options]
 
         Returns
-        ---------
-        (torch.Tensor): [batch_size, n_maps]
+        --------
+        Tensor: [batch_dim, out_features]
         """
-        pred = self.multiple_predictions(input)
-        errs = self.get_errors(pred, z)
-        return errs
+        preds = self.multiple_predictions(input)
+        if probabilities is None:
+            average = torch.mean(preds, dim=-1)
+            return average
+        return preds @ probabilities
 
-    def free_energy_func(self, x: torch.Tensor, z: torch.Tensor) -> torch.Tensor:
-        TEMPERATURE = 1
+    def multiple_predictions(self, input: Tensor) -> Tensor:
+        pred = F.linear(input, self.weight, self.bias)  
+        # [batch_size, out_features * n_probs]
+        pred = pred.reshape(-1, self.real_out_features, self.n_options)  
+        # [batch_size, out_features, n_probs]
+        return pred
+
+    def free_energy_func(
+                self, 
+                x: Tensor, 
+                z: Tensor,
+        ) -> Tensor:
         n_batch, n_dims = x.shape
         x = x[:, None, :]
-        errors = torch.cdist(x, self.multiple_predictions(z).reshape(n_batch, self.n_options, n_dims))
-        # print(x.size())
-        # print(self.multiple_predictions(z).size())
-        # print(errors.size())
-        return - torch.logsumexp(- TEMPERATURE * errors, dim=2)
+        predictions = self.multiple_predictions(z)
+        predictions = predictions.reshape(n_batch, self.n_options, n_dims)
+        self.errs = torch.cdist(x, predictions)
+        return - torch.logsumexp(- self.temperature * self.errs, dim=2)
 
 
 class SequentialAttention(nn.Sequential):
