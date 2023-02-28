@@ -1,5 +1,7 @@
 from typing import Union
 import torch
+from torch import nn
+
 from layers import AttentionLayer
 
 
@@ -7,7 +9,7 @@ class PCN(object):
 
     def __init__(
         self,
-        network,
+        network: nn.Sequential,
         dt: float = 0.01,
         device: Union[str, int] = "cpu"
     ):
@@ -85,14 +87,17 @@ class PCN(object):
                 free_energy, grads = (
                     torch.autograd.functional\
                         .vjp(
-                    attention_layer.free_energy_func, 
-                    (self.xs[l], self.xs[l-1]),
-                    v=torch.ones((self.xs[l].size(0), 1), 
-                    device=self.device)
+                        attention_layer.free_energy_func, 
+                        (self.xs[l], self.xs[l-1]),
+                        v=torch.ones(
+                            (self.xs[l].size(0), 1), 
+                            device=self.device
+                        )
                     )
                 )
                 epsdfdx, epsdfdz = grads
                 self.errs[l] = free_energy
+
                 with torch.no_grad():
                     self.xs[l] = self.xs[l] - self.dt * epsdfdx
                     self.xs[l-1] = self.xs[l-1] - self.dt * epsdfdz
@@ -106,7 +111,6 @@ class PCN(object):
 
             if (t+1) != n_iters:
                 self.clear_grads()
-
         self.set_weight_grads()
         return self.xs[0]
 
@@ -117,14 +121,11 @@ class PCN(object):
                 w: torch.Tensor
                 preds = attention_layer.multiple_predictions(self.xs[l-1])
                 fe = attention_layer._free_energy_from_preds(self.xs[l], preds)
-                # assert w.requires_grad
-                # print(fe.size())
                 dw = torch.autograd.grad(
                     fe.sum(),
                     w,
                     allow_unused=True,
                     retain_graph=True,
-                    # is_grads_batched=True
                 )[0]
                 w.grad = - dw.clone()
 
@@ -140,10 +141,8 @@ class PCN(object):
     def clear_grads(self):
         with torch.no_grad():
             for l in range(1, self.n_nodes):
-                # self.preds[l] = self.preds[l].clone()
                 self.errs[l] = self.errs[l].clone()
                 self.xs[l] = self.xs[l].clone()
-                # assert self.errs[l].requires_grad
 
     # @property
     # def free_energy(self) -> float:

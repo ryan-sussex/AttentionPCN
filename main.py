@@ -8,12 +8,12 @@ from pcn import PCN
 from layers import AttentionLayer, SequentialAttention
 
 # Training Params
-LR = 1e-4
+LR = 1e-7
 BATCH_SIZE = 64
 N_EPOCHS = 1
 # Inference Params
 INFERENCE_LR = 0.05
-INFERENCE_ITERS_TRAIN = 5
+INFERENCE_ITERS_TRAIN = 500
 INFERENCE_ITERS_TEST = 200
 
 
