@@ -87,12 +87,13 @@ class GMMLayer(AttentionLayer):
         )
         nn.Linear.__init__(self, in_features, self.real_out_features)
         self.n_options = in_features
+        mask = torch.eye(in_features, device=device)
+        self.register_buffer("mask", mask, persistent=False)
 
     def multiple_predictions(self, input: Tensor) -> Tensor:
-        mask = torch.eye(input.size(1))
         preds = [
-            F.linear(input * mask[i, :], self.weight, self.bias)
-            for i in range(mask.shape[1])
+            F.linear(input * self.mask[i, :], self.weight, self.bias)
+            for i in range(self.mask.shape[1])
         ]
         preds = torch.stack(preds)
         return preds.reshape(-1, self.real_out_features, self.n_options)
