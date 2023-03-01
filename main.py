@@ -6,20 +6,22 @@ from dataset import MNIST
 from utils import get_device, set_seed, save_run, accuracy
 from pcn import PCN
 from layers import AttentionLayer, GMMLayer
+from torchvision.datasets import MNIST as _MNIST
 
 # Training Params
 LR = 1e-4
 BATCH_SIZE = 64
-N_EPOCHS = 5
+N_EPOCHS = 1
 # Inference Params
 TEMPERATURE = 1
-INFERENCE_LR = 0.005
+INFERENCE_LR = 0.1
 INFERENCE_ITERS_TRAIN = 20
-INFERENCE_ITERS_TEST = 100
+INFERENCE_ITERS_TEST = 500
 
 
 NETWORK = nn.Sequential(
-        GMMLayer(10, 250, n_options=1, temperature=TEMPERATURE),
+        GMMLayer(10, 10, n_options=1, temperature=TEMPERATURE),
+        AttentionLayer(10, 250, n_options=1, temperature=TEMPERATURE),
         AttentionLayer(250, 250, n_options=1, temperature=TEMPERATURE),
         AttentionLayer(250, 28*28, n_options=1, temperature=TEMPERATURE)
 )
@@ -74,6 +76,12 @@ def train(seed):
                     f"[{batch_id * len(img_batch)}/"
                     f"{len(train_loader.dataset)}]"
                 )
+                print(
+                    f"Total free energy: {model.total_free_energy:.5f}"
+                    f"[{batch_id * len(img_batch)}/"
+                    f"{len(train_loader.dataset)}]"
+                )
+
 
         test_loss, test_acc = (0, 0)
         for batch_id, (img_batch, label_batch) in enumerate(test_loader):

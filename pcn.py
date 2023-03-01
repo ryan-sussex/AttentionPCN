@@ -7,7 +7,10 @@ from layers import AttentionLayer
 
 class PCN(object):
     def __init__(
-        self, network: nn.Sequential, dt: float = 0.01, device: Union[str, int] = "cpu"
+        self,
+        network: nn.Sequential,
+        dt: float = 0.01,
+        device: Union[str, int] = "cpu"
     ):
         self.network = network.to(device)
         self.n_layers = len(self.network)
@@ -24,7 +27,7 @@ class PCN(object):
         self.free_energy = [None] * self.n_nodes
 
     def reset_xs(self, prior, init_std):
-        self.set_prior(prior)
+        self.set_prior(.5 * torch.ones(prior.size(), device=self.device))
         self.propagate_xs()
         for l in range(self.n_layers):
             # Doesn't this just overwrite the first two lines?
@@ -87,9 +90,11 @@ class PCN(object):
                     if not l == (self.n_nodes - 1):
                         # Never update the observations
                         self.xs[l] = self.xs[l] - self.dt * epsdfdx
+
                     if (l == 1) and not test:
                         # If in train mode prior is fixed as known label
                         continue
+
                     self.xs[l - 1] = self.xs[l - 1] - self.dt * epsdfdz
 
             if (t + 1) != n_iters:
@@ -132,6 +137,12 @@ class PCN(object):
     @property
     def loss(self) -> float:
         return self.average_free_energy(-1)
+    
+    @property
+    def total_free_energy(self) -> float:
+        return sum(
+            [self.average_free_energy(l) for l in range(1, self.n_layers + 1)]
+        )
 
     def __str__(self):
         return f"PCN(\n{self.network}\n"
