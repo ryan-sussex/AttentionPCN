@@ -11,7 +11,7 @@ from torchvision.datasets import MNIST as _MNIST
 # Training Params
 LR = 1e-4
 BATCH_SIZE = 64
-N_EPOCHS = 1
+N_EPOCHS = 3
 # Inference Params
 TEMPERATURE = 1
 INFERENCE_LR = 0.1

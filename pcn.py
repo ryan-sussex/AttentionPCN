@@ -57,6 +57,7 @@ class PCN(object):
         n_iters: int,
         init_std: float = 0.05,
         test: bool = False,
+        test_pred: bool = False,
     ) -> torch.Tensor:
         """
         Runs n_iters of inference updates, calculating prediction errrors at
@@ -87,7 +88,7 @@ class PCN(object):
                 self.errs[l] = free_energy
 
                 with torch.no_grad():
-                    if not l == (self.n_nodes - 1):
+                    if not l == (self.n_nodes - 1) or test_pred:
                         # Never update the observations
                         self.xs[l] = self.xs[l] - self.dt * epsdfdx
 
@@ -124,6 +125,7 @@ class PCN(object):
 
     def load_weights(self, path):
         self.network.load_state_dict(torch.load(path))
+        return self
 
     def clear_grads(self):
         with torch.no_grad():
