@@ -16,7 +16,10 @@ class PCN(object):
         self.n_layers = len(self.network)
         self.n_nodes = self.n_layers + 1
         self.dt = dt
-        self.n_params = sum(p.numel() for p in network.parameters() if p.requires_grad)
+        self.n_params = sum(
+            p.numel() for p in network.parameters()
+            if p.requires_grad
+        )
         self.device = device
 
     def reset(self):
@@ -77,7 +80,7 @@ class PCN(object):
             self.network.zero_grad()
 
             for l in reversed(range(1, self.n_layers + 1)):
-                attention_layer: AttentionLayer = self.network[l - 1]
+                attention_layer: AttentionLayer = self.network[l - 1][0]
                 # Let vjp calculate the implicit attention weighted sum
                 free_energy, grads = torch.autograd.functional.vjp(
                     attention_layer.free_energy_func,
@@ -106,7 +109,7 @@ class PCN(object):
 
     def set_weight_grads(self):
         for l in range(self.n_layers):
-            attention_layer: AttentionLayer = self.network[l]
+            attention_layer: AttentionLayer = self.network[l][0]
             fe = attention_layer.free_energy_func(self.xs[l+1], self.xs[l])
             for w in self.network[l].parameters():
                 dw = torch.autograd.grad(
@@ -139,7 +142,7 @@ class PCN(object):
     @property
     def loss(self) -> float:
         return self.average_free_energy(-1)
-    
+
     @property
     def total_free_energy(self) -> float:
         return sum(

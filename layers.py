@@ -42,7 +42,9 @@ class AttentionLayer(nn.Linear):
         if probabilities is None:
             average = torch.mean(preds, dim=-1)
             return average
-        return preds @ probabilities
+        out = (preds @ probabilities.T)
+        out = out.reshape(input.shape[0], -1)
+        return out
 
     def multiple_predictions(self, input: Tensor) -> Tensor:
         pred = F.linear(input, self.weight, self.bias)

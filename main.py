@@ -6,12 +6,11 @@ from dataset import MNIST
 from utils import get_device, set_seed, save_run, accuracy
 from pcn import PCN
 from layers import AttentionLayer, GMMLayer
-from torchvision.datasets import MNIST as _MNIST
 
 # Training Params
 LR = 1e-4
 BATCH_SIZE = 64
-N_EPOCHS = 3
+N_EPOCHS = 4
 # Inference Params
 TEMPERATURE = 1
 INFERENCE_LR = 0.1
@@ -20,14 +19,25 @@ INFERENCE_ITERS_TEST = 500
 
 
 NETWORK = nn.Sequential(
-        GMMLayer(10, 10, n_options=1, temperature=TEMPERATURE),
-        AttentionLayer(10, 250, n_options=1, temperature=TEMPERATURE),
-        AttentionLayer(250, 250, n_options=1, temperature=TEMPERATURE),
-        AttentionLayer(250, 28*28, n_options=1, temperature=TEMPERATURE)
+        # GMMLayer(10, 10, n_options=1, temperature=TEMPERATURE),
+        nn.Sequential(
+            GMMLayer(10, 250, n_options=1, temperature=TEMPERATURE),
+            nn.Tanh(),
+        ),
+        nn.Sequential(
+            AttentionLayer(250, 250, n_options=1, temperature=TEMPERATURE),
+            nn.Tanh(),
+        ),
+        nn.Sequential(
+            AttentionLayer(250, 28*28, n_options=1, temperature=TEMPERATURE)
+        )
 )
+# NETWORK = nn.Sequential(
+#         GMMLayer(10, 28*28, n_options=1, temperature=TEMPERATURE),
+# )
 
 
-def train(seed):
+def train(seed, weights_path=None):
     set_seed(seed)
     device = get_device()
 
@@ -43,6 +53,9 @@ def train(seed):
         device=device,
         dt=INFERENCE_LR
     )
+    if weights_path:
+        model.load_weights(weights_path)
+
     optimizer = optim.Adam(model.network.parameters(), lr=LR)
 
     train_losses, test_losses = [], []
@@ -82,7 +95,6 @@ def train(seed):
                     f"{len(train_loader.dataset)}]"
                 )
 
-
         test_loss, test_acc = (0, 0)
         for batch_id, (img_batch, label_batch) in enumerate(test_loader):
             img_batch = img_batch.to(device)
@@ -119,4 +131,4 @@ def train(seed):
 
 
 if __name__ == "__main__":
-    train(seed=0)
+    train(seed=0, weights_path="./model/weights.pth")
