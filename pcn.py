@@ -28,6 +28,8 @@ class PCN(object):
         self.errs = [None] * self.n_nodes
         self.xs = [None] * self.n_nodes
         self.free_energy = [None] * self.n_nodes
+        self.attention = [None] * self.n_nodes
+
 
     def reset_xs(self, prior, init_std):
         self.set_prior(.5 * torch.ones(prior.size(), device=self.device))
@@ -95,6 +97,7 @@ class PCN(object):
                 )
                 epsdfdx, epsdfdz = grads
                 self.errs[l] = free_energy
+                self.attention[l] = attention_layer.attention
 
                 with torch.no_grad():
                     if not l == (self.n_nodes - 1) or test_pred:

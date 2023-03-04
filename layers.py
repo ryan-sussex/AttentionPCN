@@ -67,7 +67,7 @@ class AttentionLayer(nn.Linear):
         # Fiddling with shapes
         n_batch, n_dims = x.shape
         x = x[:, None, :]
-        predictions = predictions.reshape(n_batch, self.n_options, n_dims)
+        predictions = predictions.transpose(1, 2)
         # Calculate the error for each different prediction
         self.errs = torch.cdist(x, predictions)
         # Optionally store what the network is paying attention to

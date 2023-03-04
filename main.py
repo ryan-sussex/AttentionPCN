@@ -125,5 +125,6 @@ def train(seed, weights_path=None):
 
 
 if __name__ == "__main__":
-    WEIGHTS_PATH = None
+    # WEIGHTS_PATH = "./model/weights.pth"
+    WEIGHTS_PATH=None
     train(seed=0, weights_path=WEIGHTS_PATH)
