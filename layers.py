@@ -21,6 +21,7 @@ class AttentionLayer(nn.Linear):
         self.real_out_features = out_features
         out_features = n_options * out_features
         self.temperature = temperature
+        self.attention = None
         super().__init__(in_features, out_features, bias, device, dtype)
 
     def forward(
@@ -42,7 +43,9 @@ class AttentionLayer(nn.Linear):
         if probabilities is None:
             average = torch.mean(preds, dim=-1)
             return average
-        out = (preds @ probabilities.T)
+        out = torch.einsum('bpi,bi->bp', preds, probabilities)
+        # print(out[0])
+        # raise
         out = out.reshape(input.shape[0], -1)
         return out
 
@@ -53,7 +56,12 @@ class AttentionLayer(nn.Linear):
         # [batch_size, out_features, n_probs]
         return pred
 
-    def free_energy_func(self, x: Tensor, z: Tensor) -> Tensor:
+    def free_energy_func(
+            self,
+            x: Tensor,
+            z: Tensor,
+            record_att_weights: bool = True
+        ) -> Tensor:
         # Make multiple predictions
         predictions = self.multiple_predictions(z)
         # Fiddling with shapes
@@ -62,6 +70,9 @@ class AttentionLayer(nn.Linear):
         predictions = predictions.reshape(n_batch, self.n_options, n_dims)
         # Calculate the error for each different prediction
         self.errs = torch.cdist(x, predictions)
+        # Optionally store what the network is paying attention to
+        if record_att_weights:
+            self.attention = torch.softmax(-self.temperature * self.errs, dim=2)
         # Calculate free energy based on log sum exp of errrors
         inv_T = 1 / self.temperature
         return -inv_T * torch.logsumexp(-self.temperature * self.errs, dim=2)
@@ -87,15 +98,21 @@ class GMMLayer(AttentionLayer):
             device,
             dtype
         )
-        nn.Linear.__init__(self, in_features, self.real_out_features)
+        nn.Linear.__init__(self, in_features, self.real_out_features, bias=False)
         self.n_options = in_features
         mask = torch.eye(in_features, device=device)
         self.register_buffer("mask", mask, persistent=False)
 
     def multiple_predictions(self, input: Tensor) -> Tensor:
+        # print(input[0])
+        # print((input * self.mask[6, :])[0])
+        # raise
         preds = [
-            F.linear(input * self.mask[i, :], self.weight, self.bias)
+            F.linear(input * self.mask[i, :], self.weight, None)
             for i in range(self.mask.shape[1])
         ]
-        preds = torch.stack(preds)
-        return preds.reshape(-1, self.real_out_features, self.n_options)
+        preds = torch.stack(preds, dim=2)
+        # print(preds.shape)
+        # print(preds[0])
+        return preds
+        # return preds.reshape(-1, self.real_out_features, self.n_options)

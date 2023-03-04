@@ -2,7 +2,7 @@ from typing import Union
 import torch
 from torch import nn
 
-from layers import AttentionLayer
+from layers import AttentionLayer, GMMLayer
 
 
 class PCN(object):
@@ -51,7 +51,13 @@ class PCN(object):
 
     def propagate_xs(self):
         for l in range(1, self.n_layers):
-            self.xs[l] = self.network[l - 1](self.xs[l - 1])
+            layer = self.network[l-1]
+            if isinstance(layer, GMMLayer):
+                self.xs[l] = layer(
+                    self.xs[l - 1], probabilities=self.xs[l - 1]
+                )
+            else:
+                self.xs[l] = layer(self.xs[l - 1])
 
     def infer(
         self,
@@ -80,7 +86,7 @@ class PCN(object):
             self.network.zero_grad()
 
             for l in reversed(range(1, self.n_layers + 1)):
-                attention_layer: AttentionLayer = self.network[l - 1][0]
+                attention_layer: AttentionLayer = self.network[l - 1]
                 # Let vjp calculate the implicit attention weighted sum
                 free_energy, grads = torch.autograd.functional.vjp(
                     attention_layer.free_energy_func,
@@ -109,7 +115,7 @@ class PCN(object):
 
     def set_weight_grads(self):
         for l in range(self.n_layers):
-            attention_layer: AttentionLayer = self.network[l][0]
+            attention_layer: AttentionLayer = self.network[l]
             fe = attention_layer.free_energy_func(self.xs[l+1], self.xs[l])
             for w in self.network[l].parameters():
                 dw = torch.autograd.grad(
