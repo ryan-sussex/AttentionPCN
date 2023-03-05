@@ -36,8 +36,6 @@ def set_seed(seed: int) -> None:
 
 def accuracy(pred_labels, true_labels):
     batch_size = pred_labels.size(0)
-    correct = 0
-    for b in range(batch_size):
-        if torch.argmax(pred_labels[b, :]) == torch.argmax(true_labels[b, :]):
-            correct += 1
-    return correct / batch_size
+    pred_labels = torch.argmax(pred_labels, dim=1)
+    true_labels = torch.argmax(true_labels, dim=1)
+    return (pred_labels == true_labels) / batch_size
