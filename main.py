@@ -12,23 +12,17 @@ LR = 1e-4
 BATCH_SIZE = 64
 N_EPOCHS = 3
 # Inference Params
-TEMPERATURE = 1
+TEMPERATURE = 10
 INFERENCE_LR = 0.1
 INFERENCE_ITERS_TRAIN = 20
 INFERENCE_ITERS_TEST = 500
 
 
 NETWORK = nn.Sequential(
-        # GMMLayer(10, 10, n_options=1, temperature=TEMPERATURE),
-        # AttentionLayer(10, 10, n_options=1, temperature=TEMPERATURE),
-        # GMMLayer(10, 10, n_options=1, temperature=TEMPERATURE),
         GMMLayer(10, 250, n_options=1, temperature=TEMPERATURE),
-        AttentionLayer(250, 250, n_options=1, temperature=TEMPERATURE),
-        AttentionLayer(250, 28*28, n_options=1, temperature=TEMPERATURE)
+        AttentionLayer(250, 250, n_options=1, temperature=1),
+        AttentionLayer(250, 28*28, n_options=1, temperature=1, nonlinearity=None)
 )
-# NETWORK = nn.Sequential(
-#         GMMLayer(10, 28*28, n_options=1, temperature=TEMPERATURE),
-# )
 
 
 def train(seed, weights_path=None):
