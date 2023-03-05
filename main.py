@@ -15,13 +15,17 @@ N_EPOCHS = 3
 TEMPERATURE = 10
 INFERENCE_LR = 0.1
 INFERENCE_ITERS_TRAIN = 20
-INFERENCE_ITERS_TEST = 500
+INFERENCE_ITERS_TEST = 200
 
 
+# Note attention layer with 1 option is a standard layer. 
 NETWORK = nn.Sequential(
-        GMMLayer(10, 250, n_options=1, temperature=TEMPERATURE),
-        AttentionLayer(250, 250, n_options=1, temperature=1),
-        AttentionLayer(250, 28*28, n_options=1, temperature=1, nonlinearity=None)
+        GMMLayer(
+            10, 250, n_options=1, temperature=TEMPERATURE),
+        AttentionLayer(
+            250, 250, n_options=1, temperature=1),
+        AttentionLayer(
+            250, 28*28, n_options=1, temperature=1, nonlinearity=None)
 )
 
 
