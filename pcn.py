@@ -2,7 +2,7 @@ from typing import Union
 import torch
 from torch import nn
 
-from layers import AttentionLayer
+from layers import AttentionLayer, GMMLayer
 
 
 class PCN(object):
@@ -28,6 +28,8 @@ class PCN(object):
         self.errs = [None] * self.n_nodes
         self.xs = [None] * self.n_nodes
         self.free_energy = [None] * self.n_nodes
+        self.attention = [None] * self.n_nodes
+
 
     def reset_xs(self, prior, init_std):
         self.set_prior(.5 * torch.ones(prior.size(), device=self.device))
@@ -51,7 +53,13 @@ class PCN(object):
 
     def propagate_xs(self):
         for l in range(1, self.n_layers):
-            self.xs[l] = self.network[l - 1](self.xs[l - 1])
+            layer = self.network[l-1]
+            if isinstance(layer, GMMLayer):
+                self.xs[l] = layer(
+                    self.xs[l - 1], probabilities=self.xs[l - 1]
+                )
+            else:
+                self.xs[l] = layer(self.xs[l - 1])
 
     def infer(
         self,
@@ -80,7 +88,7 @@ class PCN(object):
             self.network.zero_grad()
 
             for l in reversed(range(1, self.n_layers + 1)):
-                attention_layer: AttentionLayer = self.network[l - 1][0]
+                attention_layer: AttentionLayer = self.network[l - 1]
                 # Let vjp calculate the implicit attention weighted sum
                 free_energy, grads = torch.autograd.functional.vjp(
                     attention_layer.free_energy_func,
@@ -89,6 +97,7 @@ class PCN(object):
                 )
                 epsdfdx, epsdfdz = grads
                 self.errs[l] = free_energy
+                self.attention[l] = attention_layer.attention
 
                 with torch.no_grad():
                     if not l == (self.n_nodes - 1) or test_pred:
@@ -109,7 +118,7 @@ class PCN(object):
 
     def set_weight_grads(self):
         for l in range(self.n_layers):
-            attention_layer: AttentionLayer = self.network[l][0]
+            attention_layer: AttentionLayer = self.network[l]
             fe = attention_layer.free_energy_func(self.xs[l+1], self.xs[l])
             for w in self.network[l].parameters():
                 dw = torch.autograd.grad(

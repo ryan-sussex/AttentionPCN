@@ -33,11 +33,8 @@ def set_seed(seed: int) -> None:
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 
-
 def accuracy(pred_labels, true_labels):
     batch_size = pred_labels.size(0)
-    correct = 0
-    for b in range(batch_size):
-        if torch.argmax(pred_labels[b, :]) == torch.argmax(true_labels[b, :]):
-            correct += 1
-    return correct / batch_size
+    pred_labels = torch.argmax(pred_labels, dim=1)
+    true_labels = torch.argmax(true_labels, dim=1)
+    return torch.sum(pred_labels == true_labels) / batch_size
