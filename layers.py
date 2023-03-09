@@ -4,10 +4,9 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 import torch.nn.functional as F
-from torch.nn.modules.activation import Tanh
 
 
-class AttentionLayer(nn.Linear):
+class AttentionLayer(nn.Module):
     def __init__(
         self,
         in_features: int,
@@ -19,13 +18,16 @@ class AttentionLayer(nn.Linear):
         device=None,
         dtype=None,
     ) -> None:
+        nn.Module.__init__(self)
+    
         self.n_options = n_options
-        self.real_out_features = out_features
-        out_features = n_options * out_features
+        for i in range(n_options):
+            self.__setattr__(f"linear_{i}", nn.Linear(in_features, out_features, bias=bias, device=device))
+        # self.real_out_features = out_features
+        # out_features = n_options * out_features
         self.temperature = temperature
         self.attention = None
         self.nonlinearity = nonlinearity
-        super().__init__(in_features, out_features, bias, device, dtype)
 
     def forward(
             self,
@@ -57,9 +59,12 @@ class AttentionLayer(nn.Linear):
         return self.nonlinearity(input)
 
     def multiple_predictions(self, input: Tensor) -> Tensor:
-        pred = F.linear(input, self.weight, self.bias)
-        pred = pred.reshape(-1, self.real_out_features, self.n_options)
-        return pred
+        preds = [
+            self.__getattr__(f"linear_{i}")(input)
+            for i in range(self.n_options)
+        ]
+        preds = torch.stack(preds, dim=2)
+        return preds
 
     def free_energy_func(
             self,
@@ -83,7 +88,7 @@ class AttentionLayer(nn.Linear):
         return -inv_T * torch.logsumexp(-self.temperature * self.errs, dim=2)
 
 
-class GMMLayer(AttentionLayer):
+class GMMLayer(AttentionLayer, nn.Linear):
     def __init__(
         self,
         in_features: int,
@@ -95,7 +100,8 @@ class GMMLayer(AttentionLayer):
         device=None,
         dtype=None,
     ) -> None:
-        super().__init__(
+        AttentionLayer.__init__(
+            self,
             in_features,
             out_features,
             bias,
@@ -105,9 +111,9 @@ class GMMLayer(AttentionLayer):
             device=device,
             dtype=dtype,
         )
-        nn.Linear.__init__(self, in_features, self.real_out_features, bias=False)
+        nn.Linear.__init__(self, in_features, out_features, bias=False)
         self.n_options = in_features
-        mask = torch.eye(in_features, device=device)
+        mask = torch.eye(self.n_options, device=device)
         self.register_buffer("mask", mask, persistent=False)
 
     def multiple_predictions(self, input: Tensor) -> Tensor:

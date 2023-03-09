@@ -37,4 +37,4 @@ def accuracy(pred_labels, true_labels):
     batch_size = pred_labels.size(0)
     pred_labels = torch.argmax(pred_labels, dim=1)
     true_labels = torch.argmax(true_labels, dim=1)
-    return torch.sum(pred_labels == true_labels) / batch_size
+    return (torch.sum(pred_labels == true_labels) / batch_size).item()

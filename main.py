@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
@@ -9,8 +10,8 @@ from layers import AttentionLayer, GMMLayer
 
 # Training Params
 LR = 1e-4
-BATCH_SIZE = 64
-N_EPOCHS = 3
+BATCH_SIZE = 128
+N_EPOCHS = 5
 # Inference Params
 TEMPERATURE = 10
 INFERENCE_LR = 0.1
@@ -21,11 +22,15 @@ INFERENCE_ITERS_TEST = 200
 # Note attention layer with 1 option is a standard layer. 
 NETWORK = nn.Sequential(
         GMMLayer(
-            10, 250, n_options=1, temperature=TEMPERATURE),
+            10, 250, n_options=1, temperature=TEMPERATURE, nonlinearity=torch.relu),
+        # AttentionLayer(
+        #     10, 10, n_options=1, temperature=TEMPERATURE),
+        # AttentionLayer(
+        #     10, 250, n_options=1, temperature=1),
         AttentionLayer(
-            250, 250, n_options=1, temperature=1),
+            250, 250, n_options=1, temperature=1, nonlinearity=torch.relu),
         AttentionLayer(
-            250, 28*28, n_options=1, temperature=1, nonlinearity=None)
+            250, 28*28, n_options=2, temperature=10, nonlinearity=None)
 )
 
 
