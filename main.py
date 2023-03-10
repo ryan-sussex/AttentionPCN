@@ -30,7 +30,7 @@ NETWORK = nn.Sequential(
         AttentionLayer(
             250, 250, n_options=1, temperature=1, nonlinearity=torch.relu),
         AttentionLayer(
-            250, 28*28, n_options=2, temperature=10, nonlinearity=None)
+            250, 28*28, n_options=2, temperature=1e-2, nonlinearity=None)
 )
 
 
@@ -128,6 +128,6 @@ def train(seed, weights_path=None):
 
 
 if __name__ == "__main__":
-    # WEIGHTS_PATH = "./model/weights.pth"
-    WEIGHTS_PATH=None
+    WEIGHTS_PATH = "./model/weights.pth"
+    # WEIGHTS_PATH=None
     train(seed=0, weights_path=WEIGHTS_PATH)
