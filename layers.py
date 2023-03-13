@@ -123,3 +123,58 @@ class GMMLayer(AttentionLayer, nn.Linear):
         ]
         preds = torch.stack(preds, dim=2)
         return preds
+
+
+class VisualSearch(AttentionLayer, nn.Linear):
+    def __init__(
+            self, 
+            in_features: int, 
+            out_features: int,
+            bias: bool = False, 
+            n_options: int = 2, 
+            temperature: Optional[int] = 1, 
+            nonlinearity=F.tanh, 
+            device=None, 
+            dtype=None
+    ) -> None:
+        super().__init__(
+            in_features,
+            out_features,
+            bias,
+            n_options,
+            temperature,
+            nonlinearity,
+            device,
+            dtype
+        )
+        nn.Linear.__init__(self, in_features, out_features, bias=False)
+    
+    def _pad_prediction(self, pred: Tensor, pos: int) -> Tensor:
+        batch_size, out_features = pred.shape
+        padded = torch.zeros(
+            (batch_size, out_features * self.n_options), 
+            device=pred.device
+        )
+        padded[:, pos * out_features: (pos + 1) * out_features] = pred
+        print(padded)
+        return padded
+
+    def multiple_predictions(self, input: Tensor) -> Tensor:
+        preds = [
+            self._pad_prediction(
+                F.linear(input, self.weight, None), pos=i
+            )
+            for i in range(self.n_options)
+        ]
+        preds = torch.stack(preds, dim=2)
+        return preds
+
+
+def pad(tensor: Tensor, n_copies: int, pos: int) -> Tensor:
+    batch_size, out_features = tensor.shape
+    padded = torch.zeros(
+        (batch_size, out_features * n_copies), 
+        device=tensor.device
+    )
+    padded[:, pos * out_features: (pos + 1) * out_features] = tensor
+    return padded
