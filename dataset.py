@@ -31,22 +31,3 @@ class MNIST(datasets.MNIST):
         label = one_hot(label)
         return img, label
 
-
-# class MNISTVisualSearch(MNIST):
-#     def __init__(self, train, path="./data", normalise=True):
-#         if normalise:
-#             transform = transforms.Compose(
-#                 [
-#                     transforms.ToTensor(),
-#                     transforms.Normalize((0.1307), (0.3081))
-#                 ]
-#             )
-#         else:
-#             transform = transforms.Compose([transforms.ToTensor()])
-#         super().__init__(path, download=True, transform=transform, train=train)
-
-#     def __getitem__(self, index):
-#         img, label = super().__getitem__(index)
-#         img = vectorise(img)
-#         label = one_hot(label)
-#         return img, label
