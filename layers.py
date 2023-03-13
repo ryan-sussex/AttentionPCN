@@ -156,7 +156,6 @@ class VisualSearch(AttentionLayer, nn.Linear):
             device=pred.device
         )
         padded[:, pos * out_features: (pos + 1) * out_features] = pred
-        print(padded)
         return padded
 
     def multiple_predictions(self, input: Tensor) -> Tensor:
