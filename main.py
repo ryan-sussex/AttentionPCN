@@ -6,12 +6,12 @@ from torch.utils.data import DataLoader
 from dataset import MNIST
 from utils import get_device, set_seed, save_run, accuracy
 from pcn import PCN
-from layers import AttentionLayer, GMMLayer
+from layers import AttentionLayer, GMMLayer, VisualSearch
 
 # Training Params
 LR = 1e-4
 BATCH_SIZE = 128
-N_EPOCHS = 5
+N_EPOCHS = 4
 # Inference Params
 TEMPERATURE = 10
 INFERENCE_LR = 0.1
@@ -22,15 +22,11 @@ INFERENCE_ITERS_TEST = 200
 # Note attention layer with 1 option is a standard layer. 
 NETWORK = nn.Sequential(
         GMMLayer(
-            10, 250, n_options=1, temperature=TEMPERATURE, nonlinearity=torch.relu),
-        # AttentionLayer(
-        #     10, 10, n_options=1, temperature=TEMPERATURE),
-        # AttentionLayer(
-        #     10, 250, n_options=1, temperature=1),
+            10, 250, n_options=1, temperature=TEMPERATURE),
         AttentionLayer(
-            250, 250, n_options=1, temperature=1, nonlinearity=torch.relu),
-        AttentionLayer(
-            250, 28*28, n_options=2, temperature=1e-2, nonlinearity=None)
+            250, 28*28, n_options=1, temperature=1),
+        VisualSearch(
+            28*28, 28*28, n_options=1, temperature=1, nonlinearity=None)
 )
 
 
@@ -53,7 +49,7 @@ def train(seed, weights_path=None):
     if weights_path:
         model.load_weights(weights_path)
 
-    optimizer = optim.Adam(model.network.parameters(), lr=LR)
+    optimizer = optim.Adam(model.network.parameters(), lr=LR, weight_decay=1)
 
     train_losses, test_losses = [], []
     test_accs = []
@@ -128,6 +124,6 @@ def train(seed, weights_path=None):
 
 
 if __name__ == "__main__":
-    WEIGHTS_PATH = "./model/weights.pth"
-    # WEIGHTS_PATH=None
+    # WEIGHTS_PATH = "./model/weights.pth"
+    WEIGHTS_PATH=None
     train(seed=0, weights_path=WEIGHTS_PATH)
